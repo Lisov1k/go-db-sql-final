@@ -17,14 +17,7 @@ func NewParcelStore(db *sql.DB) ParcelStore {
 func (s ParcelStore) Add(p Parcel) (int, error) {
 	currentTime := time.Now().UTC().Format(time.RFC3339)
 
-	db, err := sql.Open("sqlite", "tracker.db")
-	if err != nil {
-		log.Print(err)
-		return 0, err
-	}
-	defer db.Close()
-
-	res, err := db.Exec("INSERT INTO parcel (client, status, address, created_at) VALUES (:cl, :status, :address, :curTime)",
+	res, err := s.db.Exec("INSERT INTO parcel (client, status, address, created_at) VALUES (:cl, :status, :address, :curTime)",
 		sql.Named("cl", p.Client),
 		sql.Named("status", p.Status),
 		sql.Named("address", p.Address),
@@ -46,16 +39,9 @@ func (s ParcelStore) Add(p Parcel) (int, error) {
 func (s ParcelStore) Get(number int) (Parcel, error) {
 	p := Parcel{}
 
-	db, err := sql.Open("sqlite", "tracker.db")
-	if err != nil {
-		log.Print(err)
-		return Parcel{}, err
-	}
-	defer db.Close()
-
-	row := db.QueryRow("SELECT number, client, status, address, created_at FROM parcel WHERE number = :number",
+	row := s.db.QueryRow("SELECT number, client, status, address, created_at FROM parcel WHERE number = :number",
 		sql.Named("number", number))
-	err = row.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
+	err := row.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 	if err != nil {
 		log.Print(err)
 		return Parcel{}, err
@@ -66,14 +52,7 @@ func (s ParcelStore) Get(number int) (Parcel, error) {
 func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 	var res []Parcel
 
-	db, err := sql.Open("sqlite", "tracker.db")
-	if err != nil {
-		log.Print(err)
-		return nil, err
-	}
-	defer db.Close()
-
-	rows, err := db.Query("SELECT number, client, status, address, created_at FROM parcel WHERE client = :client",
+	rows, err := s.db.Query("SELECT number, client, status, address, created_at FROM parcel WHERE client = :client",
 		sql.Named("client", client))
 	if err != nil {
 		log.Print(err)
@@ -100,13 +79,8 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 }
 
 func (s ParcelStore) SetStatus(number int, status string) error {
-	db, err := sql.Open("sqlite", "tracker.db")
-	if err != nil {
-		log.Print(err)
-		return err
-	}
 
-	_, err = db.Exec("UPDATE parcel SET status = :status WHERE number = :number",
+	_, err := s.db.Exec("UPDATE parcel SET status = :status WHERE number = :number",
 		sql.Named("status", status),
 		sql.Named("number", number))
 	if err != nil {
@@ -118,15 +92,11 @@ func (s ParcelStore) SetStatus(number int, status string) error {
 }
 
 func (s ParcelStore) SetAddress(number int, address string) error {
-	db, err := sql.Open("sqlite", "tracker.db")
-	if err != nil {
-		log.Print(err)
-		return err
-	}
 
-	_, err = db.Exec("UPDATE parcel SET address = :address WHERE number = :number AND status = 'registered'",
+	_, err := s.db.Exec("UPDATE parcel SET address = :address WHERE number = :number AND status = :newStatus",
 		sql.Named("address", address),
-		sql.Named("number", number))
+		sql.Named("number", number),
+		sql.Named("newStatus", ParcelStatusRegistered))
 	if err != nil {
 		log.Print(err)
 		return err
@@ -136,14 +106,10 @@ func (s ParcelStore) SetAddress(number int, address string) error {
 }
 
 func (s ParcelStore) Delete(number int) error {
-	db, err := sql.Open("sqlite", "tracker.db")
-	if err != nil {
-		log.Print(err)
-		return err
-	}
 
-	_, err = db.Exec("DELETE FROM parcel WHERE number = :number AND status = 'registered'",
-		sql.Named("number", number))
+	_, err := s.db.Exec("DELETE FROM parcel WHERE number = :number AND status = :newStatus",
+		sql.Named("number", number),
+		sql.Named("newStatus", ParcelStatusRegistered))
 	if err != nil {
 		log.Print(err)
 		return err
